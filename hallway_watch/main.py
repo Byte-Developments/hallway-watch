@@ -6,29 +6,18 @@ import argparse
 import logging
 import sys
 import time
-from pathlib import Path
 
 import cv2
 
 from hallway_watch.audio import play_sound
 from hallway_watch.config import AppConfig, load_config
+from hallway_watch.detection_log import DetectionLogger
 from hallway_watch.detector import HeadDetector, load_roi_mask
+from hallway_watch.logging_setup import setup_logging
 from hallway_watch.motion import MotionGate
 from hallway_watch.preprocess import prepare_frame
 from hallway_watch.visit import VisitTracker
 from hallway_watch.web import NotificationServer
-
-
-def setup_logging(config: AppConfig) -> None:
-    level = getattr(logging, config.logging.level.upper(), logging.INFO)
-    handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
-    if config.logging.file:
-        handlers.append(logging.FileHandler(config.logging.file))
-    logging.basicConfig(
-        level=level,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        handlers=handlers,
-    )
 
 
 def open_camera(config: AppConfig) -> cv2.VideoCapture:
@@ -44,16 +33,28 @@ def open_camera(config: AppConfig) -> cv2.VideoCapture:
 def trigger_alert(
     config: AppConfig,
     logger: logging.Logger,
+    detection_logger: DetectionLogger,
     notification_server: NotificationServer | None,
+    detections: list[tuple[int, int, int, int, float]],
 ) -> None:
-    logger.info("Head detected — triggering alert")
+    max_conf = max(conf for _, _, _, _, conf in detections)
+    detection_logger.log_alert(len(detections), max_conf)
+    logger.info(
+        "Head detected — triggering alert (count=%d max_conf=%.0f%%)",
+        len(detections),
+        max_conf * 100,
+    )
     if config.audio.enabled:
         play_sound(config.audio.sound_file, config.audio.device)
     if config.notifications.enabled and notification_server is not None:
         notification_server.notify()
 
 
-def run(config: AppConfig, preview: bool = False) -> None:
+def run(
+    config: AppConfig,
+    detection_logger: DetectionLogger,
+    preview: bool = False,
+) -> None:
     logger = logging.getLogger("hallway_watch")
     cap = open_camera(config)
 
@@ -92,6 +93,11 @@ def run(config: AppConfig, preview: bool = False) -> None:
         notification_server.start()
 
     logger.info("Hallway watch started (preview=%s)", preview)
+    logger.debug(
+        "Logging detections to %s, debug to %s",
+        config.logging.detection_log_dir,
+        config.logging.debug_log_dir,
+    )
 
     try:
         while True:
@@ -115,12 +121,27 @@ def run(config: AppConfig, preview: bool = False) -> None:
             head_seen = False
             detections: list[tuple[int, int, int, int, float]] = []
             if motion.has_motion(processed):
+                logger.debug("Motion detected — running inference")
                 detections = detector.detect(processed)
+                if detections:
+                    detection_logger.log_heads(detections)
+                    logger.debug(
+                        "Heads detected: %d (max conf %.0f%%)",
+                        len(detections),
+                        max(c for *_, c in detections) * 100,
+                    )
                 head_seen = len(detections) > 0
 
             now = time.monotonic()
-            if visit_tracker.update(head_seen, now):
-                trigger_alert(config, logger, notification_server)
+            should_alert, visit_cleared = visit_tracker.update(head_seen, now)
+            if visit_cleared:
+                detection_logger.log_visit_clear()
+                logger.debug("Visit cleared — hallway empty")
+
+            if should_alert and detections:
+                trigger_alert(
+                    config, logger, detection_logger, notification_server, detections
+                )
 
             if preview:
                 for x1, y1, x2, y2, conf in detections:
@@ -152,6 +173,7 @@ def run(config: AppConfig, preview: bool = False) -> None:
     finally:
         if notification_server is not None:
             notification_server.stop()
+        detection_logger.close()
         cap.release()
         if preview:
             cv2.destroyAllWindows()
@@ -170,8 +192,8 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_config(args.config)
-    setup_logging(config)
-    run(config, preview=args.preview)
+    detection_logger = setup_logging(config)
+    run(config, detection_logger, preview=args.preview)
 
 
 if __name__ == "__main__":

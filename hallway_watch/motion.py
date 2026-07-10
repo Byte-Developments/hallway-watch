@@ -5,6 +5,7 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
+# further, for logs just add log message to container
 
 class MotionGate:
     """Background-subtraction motion detector to reduce CPU usage."""

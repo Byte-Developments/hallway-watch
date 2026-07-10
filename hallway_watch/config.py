@@ -62,7 +62,9 @@ class NotificationConfig:
 @dataclass
 class LoggingConfig:
     level: str = "INFO"
-    file: str = "hallway-watch.log"
+    debug_level: str = "DEBUG"
+    detection_log_dir: str = "logs/detections"
+    debug_log_dir: str = "logs/debug"
 
 
 @dataclass

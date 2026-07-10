@@ -5,9 +5,10 @@ __pycache__/
 venv/
 .env
 config.yaml
-*.log
+install.log
 certs/
 data/
+logs/
 .DS_Store
 models/*.pt
 !models/.gitkeep

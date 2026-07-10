@@ -44,4 +44,6 @@ notifications:
 
 logging:
   level: INFO
-  file: hallway-watch.log
+  debug_level: DEBUG
+  detection_log_dir: logs/detections
+  debug_log_dir: logs/debug

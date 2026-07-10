@@ -61,6 +61,31 @@ git_branch() {
   fi
 }
 
+require_service() {
+  if ! command -v systemctl >/dev/null 2>&1; then
+    echo "systemctl not found — is this a systemd-based system?" >&2
+    exit 1
+  fi
+  if ! systemctl list-unit-files hallway-watch.service >/dev/null 2>&1; then
+    echo "hallway-watch.service not installed — run install.sh first." >&2
+    exit 1
+  fi
+}
+
+cmd_start() {
+  require_service
+  log "Starting hallway-watch"
+  sudo systemctl start hallway-watch
+  sudo systemctl --no-pager --full status hallway-watch || true
+}
+
+cmd_stop() {
+  require_service
+  log "Stopping hallway-watch"
+  sudo systemctl stop hallway-watch
+  echo "hallway-watch stopped."
+}
+
 cmd_update() {
   cd "$PROJECT_DIR"
 
@@ -88,12 +113,9 @@ cmd_update() {
   bash "${PROJECT_DIR}/scripts/download_model.sh"
 
   log "Restarting hallway-watch service"
-  if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files hallway-watch.service >/dev/null 2>&1; then
-    sudo systemctl restart hallway-watch
-    sudo systemctl --no-pager --full status hallway-watch || true
-  else
-    echo "    Service not installed — skipping restart"
-  fi
+  require_service
+  sudo systemctl restart hallway-watch
+  sudo systemctl --no-pager --full status hallway-watch || true
 
   echo
   echo "Update complete."
@@ -112,6 +134,24 @@ cmd_status() {
   fi
 }
 
+cmd_logs() {
+  cd "$PROJECT_DIR"
+  if [[ ! -x .venv/bin/python ]]; then
+    echo "Virtual environment missing — run install.sh first." >&2
+    exit 1
+  fi
+  exec .venv/bin/python -m hallway_watch.log_viewer --mode detections --project-dir "$PROJECT_DIR"
+}
+
+cmd_debug() {
+  cd "$PROJECT_DIR"
+  if [[ ! -x .venv/bin/python ]]; then
+    echo "Virtual environment missing — run install.sh first." >&2
+    exit 1
+  fi
+  exec .venv/bin/python -m hallway_watch.log_viewer --mode debug --project-dir "$PROJECT_DIR"
+}
+
 usage() {
   cat <<EOF
 Hallway Watch — hwatch
@@ -119,15 +159,25 @@ Hallway Watch — hwatch
 Usage: hwatch <command>
 
 Commands:
+  start     Start the hallway-watch service
+  stop      Stop the hallway-watch service
   update    Pull latest code, update pip deps + model, restart service
   status    Show install path, git commit, and service state
+  logs      Interactive detection log viewer (scroll, search, live tail)
+  debug     Interactive developer/debug log viewer
   help      Show this help
+
+Log viewer keys: j/k scroll  / search  n/N next match  f follow  g/G top/bottom  o older file  q quit
 EOF
 }
 
 case "${1:-help}" in
+  start) cmd_start ;;
+  stop) cmd_stop ;;
   update) cmd_update ;;
   status) cmd_status ;;
+  logs) cmd_logs ;;
+  debug) cmd_debug ;;
   help|-h|--help) usage ;;
   *)
     echo "Unknown command: $1" >&2

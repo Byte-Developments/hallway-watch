@@ -173,7 +173,9 @@ TLS_CERT="certs/cert.pem"
 TLS_KEY="certs/key.pem"
 VAPID_CONTACT="mailto:hallway-watch@local"
 LOG_LEVEL="INFO"
-LOG_FILE="hallway-watch.log"
+LOG_DEBUG_LEVEL="DEBUG"
+DETECTION_LOG_DIR="logs/detections"
+DEBUG_LOG_DIR="logs/debug"
 DETECTION_MODEL="models/yolov8n.pt"
 START_SERVICE=true
 INSTALL_LOG=""
@@ -272,7 +274,9 @@ notifications:
 
 logging:
   level: ${LOG_LEVEL}
-  file: ${LOG_FILE}
+  debug_level: ${LOG_DEBUG_LEVEL}
+  detection_log_dir: ${DETECTION_LOG_DIR}
+  debug_log_dir: ${DEBUG_LOG_DIR}
 EOF
 
   echo "${GREEN}✓${RESET} Wrote config.yaml"
@@ -339,6 +343,7 @@ run_install() {
   fi
 
   mkdir -p "${PROJECT_DIR}/assets/sounds" "${PROJECT_DIR}/data" "${PROJECT_DIR}/certs"
+  mkdir -p "${PROJECT_DIR}/logs/detections" "${PROJECT_DIR}/logs/debug"
 
   echo "==> [4/5] TLS certificate"
   if [[ ! -f "${PROJECT_DIR}/certs/cert.pem" ]]; then

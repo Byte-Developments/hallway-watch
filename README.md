@@ -101,6 +101,19 @@ sudo systemctl status hallway-watch
 journalctl -u hallway-watch -f
 ```
 
+## Logs
+
+Detection events are saved daily to `logs/detections/detections-YYYY-MM-DD.log`. Previous days are gzip-compressed automatically. Developer logs go to `logs/debug/debug-YYYY-MM-DD.log`.
+
+```bash
+hwatch start    # start the service
+hwatch stop     # stop the service
+hwatch logs     # detection events — scroll, search, live tail
+hwatch debug    # full app debug log (motion, inference, web, etc.)
+```
+
+**Viewer keys:** `j`/`k` scroll · `/` search · `n`/`N` next match · `f` follow · `g`/`G` top/bottom · `o` older file · `q` quit
+
 ## Hardware
 
 - Raspberry Pi 4 or 5 (Pi 3 works but is slower)
