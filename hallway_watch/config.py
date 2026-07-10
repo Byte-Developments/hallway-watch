@@ -9,22 +9,33 @@ import yaml
 @dataclass
 class CameraConfig:
     device: int = 0
-    width: int = 640
-    height: int = 480
-    fps: int = 10
+    width: int = 800
+    height: int = 600
+    fps: int = 8
 
 
 @dataclass
 class DetectionConfig:
     model: str = "models/yolov8n.pt"
-    confidence: float = 0.55
-    motion_threshold: int = 25
-    alert_cooldown_seconds: int = 30
+    # Lower confidence catches distant / dim heads; confirm_frames reduces false alerts
+    confidence: float = 0.42
+    motion_threshold: int = 18
+    motion_min_area: int = 600
+    # Min seconds between alerts for separate visits (backup guard)
+    alert_cooldown_seconds: int = 15
+    # Frames without a head before the hallway counts as empty again (~1.5s @ 8fps)
+    visit_clear_frames: int = 12
     roi_mask: str | None = None
-    # Grayscale + CLAHE before motion/AI — helps in dark hallways
     low_light_enhance: bool = True
-    # Top fraction of a person box treated as the head (0.25–0.45 typical)
-    head_height_fraction: float = 0.35
+    clahe_clip_limit: float = 4.0
+    clahe_tile_size: int = 8
+    gamma: float = 1.35
+    denoise: bool = True
+    head_height_fraction: float = 0.45
+    # Boxes smaller than this (px) are treated as distant head-only detections
+    small_box_height: int = 100
+    imgsz: int = 736
+    confirm_frames: int = 2
 
 
 @dataclass

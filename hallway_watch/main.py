@@ -15,6 +15,7 @@ from hallway_watch.config import AppConfig, load_config
 from hallway_watch.detector import HeadDetector, load_roi_mask
 from hallway_watch.motion import MotionGate
 from hallway_watch.preprocess import prepare_frame
+from hallway_watch.visit import VisitTracker
 from hallway_watch.web import NotificationServer
 
 
@@ -62,18 +63,27 @@ def run(config: AppConfig, preview: bool = False) -> None:
         raise RuntimeError("Could not read initial frame from camera")
 
     roi_mask = load_roi_mask(config.detection.roi_mask, frame.shape)
-    motion = MotionGate(threshold=config.detection.motion_threshold)
+    motion = MotionGate(
+        threshold=config.detection.motion_threshold,
+        min_area=config.detection.motion_min_area,
+    )
     motion.set_roi_mask(roi_mask)
 
+    det = config.detection
     detector = HeadDetector(
-        config.detection.model,
-        config.detection.confidence,
-        config.detection.head_height_fraction,
+        det.model,
+        det.confidence,
+        det.head_height_fraction,
+        det.small_box_height,
+        det.imgsz,
     )
     detector.set_roi_mask(roi_mask)
 
-    last_alert = 0.0
-    cooldown = config.detection.alert_cooldown_seconds
+    visit_tracker = VisitTracker(
+        confirm_frames=det.confirm_frames,
+        clear_frames=det.visit_clear_frames,
+        min_seconds_between_visits=det.alert_cooldown_seconds,
+    )
     frame_interval = 1.0 / max(config.camera.fps, 1)
 
     notification_server: NotificationServer | None = None
@@ -92,19 +102,25 @@ def run(config: AppConfig, preview: bool = False) -> None:
                 time.sleep(0.5)
                 continue
 
-            processed = prepare_frame(frame, config.detection.low_light_enhance)
-            display = processed if config.detection.low_light_enhance else frame
+            processed = prepare_frame(
+                frame,
+                det.low_light_enhance,
+                clahe_clip_limit=det.clahe_clip_limit,
+                clahe_tile_size=det.clahe_tile_size,
+                gamma=det.gamma,
+                denoise=det.denoise,
+            )
+            display = processed if det.low_light_enhance else frame
 
-            head_detected = False
+            head_seen = False
             detections: list[tuple[int, int, int, int, float]] = []
             if motion.has_motion(processed):
                 detections = detector.detect(processed)
-                head_detected = len(detections) > 0
+                head_seen = len(detections) > 0
 
             now = time.monotonic()
-            if head_detected and (now - last_alert) >= cooldown:
+            if visit_tracker.update(head_seen, now):
                 trigger_alert(config, logger, notification_server)
-                last_alert = now
 
             if preview:
                 for x1, y1, x2, y2, conf in detections:

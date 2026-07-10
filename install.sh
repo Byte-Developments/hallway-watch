@@ -144,14 +144,21 @@ PI_HOSTNAME="$(hostname -s 2>/dev/null || echo raspberrypi)"
 
 # config defaults
 CAMERA_DEVICE=0
-CAMERA_WIDTH=640
-CAMERA_HEIGHT=480
-CAMERA_FPS=10
-DETECTION_CONFIDENCE=0.55
-MOTION_THRESHOLD=25
-ALERT_COOLDOWN=30
+CAMERA_WIDTH=800
+CAMERA_HEIGHT=600
+CAMERA_FPS=8
+DETECTION_CONFIDENCE=0.42
+MOTION_THRESHOLD=18
+MOTION_MIN_AREA=600
+ALERT_COOLDOWN=15
+VISIT_CLEAR_FRAMES=12
 LOW_LIGHT_ENHANCE=true
-HEAD_HEIGHT_FRACTION=0.35
+CLAHE_CLIP_LIMIT=4.0
+GAMMA=1.35
+HEAD_HEIGHT_FRACTION=0.45
+SMALL_BOX_HEIGHT=100
+IMGSZ=736
+CONFIRM_FRAMES=2
 ROI_MASK=""
 AUDIO_ENABLED=true
 SOUND_FILE="assets/sounds/alert.wav"
@@ -182,9 +189,9 @@ if [[ "$NONINTERACTIVE" == "false" ]]; then
   echo
 
   echo "${BOLD}Detection${RESET}"
-  prompt DETECTION_CONFIDENCE "  Confidence threshold (0.45–0.65)" "$DETECTION_CONFIDENCE"
+  prompt DETECTION_CONFIDENCE "  Confidence (lower = distant/dim heads, try 0.38–0.50)" "$DETECTION_CONFIDENCE"
   prompt MOTION_THRESHOLD "  Motion sensitivity (lower = more sensitive)" "$MOTION_THRESHOLD"
-  prompt ALERT_COOLDOWN "  Seconds between alerts" "$ALERT_COOLDOWN"
+  prompt ALERT_COOLDOWN "  Min seconds between separate visits" "$ALERT_COOLDOWN"
   prompt_yn LOW_LIGHT_ENHANCE "  Low-light mode (grayscale + contrast boost)" "y"
   prompt HEAD_HEIGHT_FRACTION "  Head box height fraction" "$HEAD_HEIGHT_FRACTION"
   prompt ROI_MASK "  ROI mask PNG path (leave blank to skip)" ""
@@ -233,9 +240,18 @@ detection:
   model: ${DETECTION_MODEL}
   confidence: ${DETECTION_CONFIDENCE}
   motion_threshold: ${MOTION_THRESHOLD}
+  motion_min_area: ${MOTION_MIN_AREA}
   alert_cooldown_seconds: ${ALERT_COOLDOWN}
+  visit_clear_frames: ${VISIT_CLEAR_FRAMES}
   low_light_enhance: ${LOW_LIGHT_ENHANCE}
+  clahe_clip_limit: ${CLAHE_CLIP_LIMIT}
+  clahe_tile_size: 8
+  gamma: ${GAMMA}
+  denoise: true
   head_height_fraction: ${HEAD_HEIGHT_FRACTION}
+  small_box_height: ${SMALL_BOX_HEIGHT}
+  imgsz: ${IMGSZ}
+  confirm_frames: ${CONFIRM_FRAMES}
 ${roi_block}
 
 audio:

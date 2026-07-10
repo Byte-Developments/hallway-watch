@@ -1,4 +1,4 @@
-"""Head detection using YOLOv8 nano (person class, head region extraction)."""
+"""Head detection using YOLOv8 nano — tuned for night, head-only, and distance."""
 
 from __future__ import annotations
 
@@ -17,11 +17,15 @@ class HeadDetector:
     def __init__(
         self,
         model_path: str,
-        confidence: float = 0.55,
-        head_height_fraction: float = 0.35,
+        confidence: float = 0.42,
+        head_height_fraction: float = 0.45,
+        small_box_height: int = 100,
+        imgsz: int = 736,
     ) -> None:
         self.confidence = confidence
         self.head_height_fraction = head_height_fraction
+        self.small_box_height = small_box_height
+        self.imgsz = imgsz
         self._model = YOLO(model_path)
         self._roi_mask: np.ndarray | None = None
 
@@ -31,8 +35,13 @@ class HeadDetector:
     def _head_bbox(
         self, x1: int, y1: int, x2: int, y2: int
     ) -> tuple[int, int, int, int]:
-        """Upper portion of a person box — where the head lives."""
+        """Head region — full box when small (distant / head-only peek)."""
         height = max(y2 - y1, 1)
+        width = max(x2 - x1, 1)
+
+        if height <= self.small_box_height or width <= self.small_box_height:
+            return x1, y1, x2, y2
+
         head_height = max(int(height * self.head_height_fraction), 12)
         return x1, y1, x2, min(y1 + head_height, y2)
 
@@ -53,7 +62,9 @@ class HeadDetector:
             conf=self.confidence,
             classes=[PERSON_CLASS_ID],
             verbose=False,
-            imgsz=640,
+            imgsz=self.imgsz,
+            iou=0.5,
+            max_det=10,
         )
 
         detections: list[tuple[int, int, int, int, float]] = []
@@ -72,7 +83,6 @@ class HeadDetector:
         return detections
 
 
-# Backwards-compatible alias
 PersonDetector = HeadDetector
 
 
@@ -92,6 +102,5 @@ def load_roi_mask(path: str | None, frame_shape: tuple[int, ...]) -> np.ndarray 
     if mask.shape[:2] != (h, w):
         mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
 
-    # Binarize so grey pixels don't create fuzzy edges in dark scenes
     _, mask = cv2.threshold(mask, ROI_WHITE_THRESHOLD, 255, cv2.THRESH_BINARY)
     return mask

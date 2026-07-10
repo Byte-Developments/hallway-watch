@@ -2,36 +2,37 @@
 #   cp config.yaml.example config.yaml
 
 camera:
-  device: 0          # /dev/video0
-  width: 640
-  height: 480
-  fps: 10            # lower = lighter on CPU
+  device: 0
+  width: 800          # higher res helps distant heads (Pi 4/5)
+  height: 600
+  fps: 8              # slightly lower fps frees CPU for larger imgsz
 
 detection:
-  model: models/yolov8n.pt  # downloaded by install.sh
-  confidence: 0.55
-  # Only run AI when motion exceeds this threshold (0-255, lower = more sensitive)
-  motion_threshold: 25
-  # Seconds between alerts for the same "visit"
-  alert_cooldown_seconds: 30
-  # Grayscale + contrast boost before motion/AI — use for dark hallways
+  model: models/yolov8n.pt
+  confidence: 0.42    # lower = catch dim/distant heads (pair with confirm_frames)
+  motion_threshold: 18
+  motion_min_area: 600   # smaller blobs count (distant movement)
+  alert_cooldown_seconds: 15   # min gap between separate visits (backup)
+  visit_clear_frames: 12       # empty frames before someone counts as "left"
   low_light_enhance: true
-  # Top fraction of a person box counted as the head (0.25–0.45 typical)
-  head_height_fraction: 0.35
+  clahe_clip_limit: 4.0
+  clahe_tile_size: 8
+  gamma: 1.35           # brighten dark frames; auto-boosts when very dark
+  denoise: true
+  head_height_fraction: 0.45
+  small_box_height: 100   # boxes below this px → treat as distant head-only
+  imgsz: 736              # larger inference helps small/distant people
+  confirm_frames: 2       # consecutive hits before alert (cuts false positives)
   # Optional: black-and-white PNG mask (white = watch, black = ignore)
-  # Use pure #000000 / #FFFFFF — grey edges are binarized at 127
   # roi_mask: assets/roi_mask.png
 
 audio:
   enabled: true
-  # Place a .wav file in assets/sounds/ (e.g. doorbell.wav)
   sound_file: assets/sounds/alert.wav
-  # aplay device for 3.5mm jack (usually "default" on Raspberry Pi OS)
   device: default
 
 notifications:
   enabled: true
-  # HTTPS page for background browser notifications — open https://<pi-ip>:8765 once
   host: 0.0.0.0
   port: 8765
   title: Hallway Alert

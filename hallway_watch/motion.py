@@ -9,11 +9,16 @@ import numpy as np
 class MotionGate:
     """Background-subtraction motion detector to reduce CPU usage."""
 
-    def __init__(self, threshold: int = 25, min_area: int = 1500) -> None:
+    def __init__(
+        self,
+        threshold: int = 18,
+        min_area: int = 600,
+        bg_var_threshold: int = 12,
+    ) -> None:
         self.threshold = threshold
         self.min_area = min_area
         self._bg: cv2.BackgroundSubtractor = cv2.createBackgroundSubtractorMOG2(
-            history=120, varThreshold=16, detectShadows=False
+            history=120, varThreshold=bg_var_threshold, detectShadows=False
         )
         self._roi_mask: np.ndarray | None = None
 
