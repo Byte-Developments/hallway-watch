@@ -1,0 +1,16 @@
+[Unit]
+Description=Hallway Watch - person detection
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/hallway-watch
+ExecStart=/home/pi/hallway-watch/.venv/bin/python -m hallway_watch.main
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+# Hallway Watch CLI — run "hwatch update" to pull latest code and restart.
+set -euo pipefail
+
+DEFAULT_REPO="https://github.com/Byte-Developments/hallway-watch.git"
+CONFIG_FILE="/etc/hallway-watch.conf"
+
+if [[ -f "$CONFIG_FILE" ]]; then
+  # shellcheck disable=SC1091
+  source "$CONFIG_FILE"
+fi
+
+resolve_project_dir() {
+  if [[ -n "${HALLWAY_WATCH_DIR:-}" && -f "${HALLWAY_WATCH_DIR}/hallway_watch/main.py" ]]; then
+    printf '%s' "$HALLWAY_WATCH_DIR"
+    return
+  fi
+
+  local script=""
+  if [[ -L "${BASH_SOURCE[0]}" ]]; then
+    script="$(readlink -f "${BASH_SOURCE[0]}")"
+  else
+    script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+  fi
+  local dir
+  dir="$(cd "$(dirname "$script")/.." && pwd)"
+  if [[ -f "$dir/hallway_watch/main.py" ]]; then
+    printf '%s' "$dir"
+    return
+  fi
+
+  local fallback="${HOME}/hallway-watch"
+  if [[ -f "$fallback/hallway_watch/main.py" ]]; then
+    printf '%s' "$fallback"
+    return
+  fi
+
+  echo "Could not find Hallway Watch install. Run install.sh first." >&2
+  exit 1
+}
+
+PROJECT_DIR="$(resolve_project_dir)"
+REPO_URL="${HALLWAY_WATCH_REPO:-$DEFAULT_REPO}"
+
+log() {
+  echo "==> $*"
+}
+
+git_branch() {
+  cd "$PROJECT_DIR"
+  local branch
+  branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+  if [[ -n "$branch" && "$branch" != "HEAD" ]]; then
+    printf '%s' "$branch"
+    return
+  fi
+  if git show-ref --verify --quiet refs/remotes/origin/main; then
+    printf '%s' "main"
+  else
+    printf '%s' "master"
+  fi
+}
+
+cmd_update() {
+  cd "$PROJECT_DIR"
+
+  if [[ ! -d .git ]]; then
+    echo "No git checkout at ${PROJECT_DIR}. Re-run install.sh or clone ${REPO_URL}." >&2
+    exit 1
+  fi
+
+  log "Pulling latest code from GitHub"
+  git remote set-url origin "$REPO_URL" 2>/dev/null || git remote add origin "$REPO_URL"
+  git fetch origin
+  local branch
+  branch="$(git_branch)"
+  git pull --ff-only "origin" "$branch"
+
+  log "Updating pip libraries"
+  if [[ ! -x .venv/bin/pip ]]; then
+    echo "Virtual environment missing — run ${PROJECT_DIR}/install.sh" >&2
+    exit 1
+  fi
+  .venv/bin/pip install --upgrade pip -q
+  .venv/bin/pip install -r requirements.txt -q
+
+  log "Checking model weights"
+  bash "${PROJECT_DIR}/scripts/download_model.sh"
+
+  log "Restarting hallway-watch service"
+  if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files hallway-watch.service >/dev/null 2>&1; then
+    sudo systemctl restart hallway-watch
+    sudo systemctl --no-pager --full status hallway-watch || true
+  else
+    echo "    Service not installed — skipping restart"
+  fi
+
+  echo
+  echo "Update complete."
+}
+
+cmd_status() {
+  cd "$PROJECT_DIR"
+  echo "Project:  ${PROJECT_DIR}"
+  echo "Repo:     ${REPO_URL}"
+  if [[ -d .git ]]; then
+    echo "Branch:   $(git_branch)"
+    echo "Commit:   $(git rev-parse --short HEAD)"
+  fi
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl is-active hallway-watch 2>/dev/null || echo "Service:  not running"
+  fi
+}
+
+usage() {
+  cat <<EOF
+Hallway Watch — hwatch
+
+Usage: hwatch <command>
+
+Commands:
+  update    Pull latest code, update pip deps + model, restart service
+  status    Show install path, git commit, and service state
+  help      Show this help
+EOF
+}
+
+case "${1:-help}" in
+  update) cmd_update ;;
+  status) cmd_status ;;
+  help|-h|--help) usage ;;
+  *)
+    echo "Unknown command: $1" >&2
+    usage
+    exit 1
+    ;;
+esac

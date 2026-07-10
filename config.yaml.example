@@ -1,0 +1,46 @@
+# Copy to config.yaml and edit for your setup:
+#   cp config.yaml.example config.yaml
+
+camera:
+  device: 0          # /dev/video0
+  width: 640
+  height: 480
+  fps: 10            # lower = lighter on CPU
+
+detection:
+  model: models/yolov8n.pt  # downloaded by install.sh
+  confidence: 0.55
+  # Only run AI when motion exceeds this threshold (0-255, lower = more sensitive)
+  motion_threshold: 25
+  # Seconds between alerts for the same "visit"
+  alert_cooldown_seconds: 30
+  # Grayscale + contrast boost before motion/AI — use for dark hallways
+  low_light_enhance: true
+  # Top fraction of a person box counted as the head (0.25–0.45 typical)
+  head_height_fraction: 0.35
+  # Optional: black-and-white PNG mask (white = watch, black = ignore)
+  # Use pure #000000 / #FFFFFF — grey edges are binarized at 127
+  # roi_mask: assets/roi_mask.png
+
+audio:
+  enabled: true
+  # Place a .wav file in assets/sounds/ (e.g. doorbell.wav)
+  sound_file: assets/sounds/alert.wav
+  # aplay device for 3.5mm jack (usually "default" on Raspberry Pi OS)
+  device: default
+
+notifications:
+  enabled: true
+  # HTTPS page for background browser notifications — open https://<pi-ip>:8765 once
+  host: 0.0.0.0
+  port: 8765
+  title: Hallway Alert
+  message: Someone is in the hallway
+  tls_enabled: true
+  tls_cert: certs/cert.pem
+  tls_key: certs/key.pem
+  vapid_contact: mailto:hallway-watch@local
+
+logging:
+  level: INFO
+  file: hallway-watch.log

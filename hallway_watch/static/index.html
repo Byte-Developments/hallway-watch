@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hallway Watch</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #111318;
+      --card: #1b1f27;
+      --text: #f2f4f8;
+      --muted: #9aa3b2;
+      --accent: #4f8cff;
+      --ok: #3ecf8e;
+      --warn: #f5a524;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at top, #1a2233, var(--bg));
+      color: var(--text);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    main {
+      width: min(480px, 100%);
+      background: var(--card);
+      border: 1px solid #2a3140;
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.5rem;
+    }
+
+    p {
+      margin: 0 0 16px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    button {
+      width: 100%;
+      border: none;
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--accent);
+      color: white;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .status {
+      margin-top: 18px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: #12151c;
+      font-size: 0.95rem;
+    }
+
+    .status.ok { color: var(--ok); }
+    .status.warn { color: var(--warn); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Hallway Watch</h1>
+    <p>
+      Enable notifications once to get hallway alerts on this Mac — even when
+      this page is closed. Your browser will ask for permission.
+    </p>
+    <button id="enable-btn" type="button">Enable notifications</button>
+    <div id="status" class="status warn">Notifications not enabled yet.</div>
+  </main>
+
+  <script>
+    const btn = document.getElementById("enable-btn");
+    const status = document.getElementById("status");
+
+    function setStatus(text, kind) {
+      status.textContent = text;
+      status.className = "status " + kind;
+    }
+
+    function markEnabled() {
+      btn.disabled = true;
+      btn.textContent = "Notifications enabled";
+      setStatus(
+        "All set — you can close this page. Alerts will still appear.",
+        "ok"
+      );
+    }
+
+    function urlBase64ToUint8Array(base64String) {
+      const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+      const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+      const rawData = window.atob(base64);
+      const outputArray = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; i += 1) {
+        outputArray[i] = rawData.charCodeAt(i);
+      }
+      return outputArray;
+    }
+
+    async function fetchPublicKey() {
+      const response = await fetch("/vapid-public-key");
+      if (!response.ok) {
+        throw new Error("Could not fetch VAPID public key");
+      }
+      const data = await response.json();
+      return data.publicKey;
+    }
+
+    async function saveSubscription(subscription) {
+      const response = await fetch("/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(subscription),
+      });
+      if (!response.ok) {
+        throw new Error("Could not save push subscription");
+      }
+    }
+
+    async function registerServiceWorker() {
+      return navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" });
+    }
+
+    async function ensurePushSubscription(registration) {
+      const publicKey = await fetchPublicKey();
+      let subscription = await registration.pushManager.getSubscription();
+
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
+        });
+      }
+
+      await saveSubscription(subscription.toJSON());
+      return subscription;
+    }
+
+    async function enableNotifications() {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        setStatus("This browser does not support background notifications.", "warn");
+        btn.disabled = true;
+        return;
+      }
+
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setStatus("Notifications blocked. Allow them in browser settings.", "warn");
+        return;
+      }
+
+      const registration = await registerServiceWorker();
+      await navigator.serviceWorker.ready;
+      await ensurePushSubscription(registration);
+      markEnabled();
+    }
+
+    async function restoreExistingSubscription() {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+        return;
+      }
+      if (Notification.permission !== "granted") {
+        return;
+      }
+
+      try {
+        const registration = await registerServiceWorker();
+        await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        if (!subscription) {
+          return;
+        }
+
+        await saveSubscription(subscription.toJSON());
+        markEnabled();
+      } catch (err) {
+        console.error("Could not restore push subscription", err);
+      }
+    }
+
+    btn.addEventListener("click", () => {
+      enableNotifications().catch((err) => {
+        console.error(err);
+        setStatus("Failed to enable notifications. Check the console.", "warn");
+      });
+    });
+
+    restoreExistingSubscription();
+  </script>
+</body>
+</html>
