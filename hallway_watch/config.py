@@ -12,6 +12,8 @@ class CameraConfig:
     width: int = 800
     height: int = 600
     fps: int = 8
+    recovery_enabled: bool = True
+    recovery_max_failures: int = 15
 
 
 @dataclass
@@ -63,6 +65,7 @@ class NotificationConfig:
 class SnapshotsConfig:
     enabled: bool = True
     dir: str = "snapshots"
+    retention_days: int = 7
 
 
 @dataclass

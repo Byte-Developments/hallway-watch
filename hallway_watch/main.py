@@ -10,25 +10,16 @@ import time
 import cv2
 
 from hallway_watch.audio import play_sound
+from hallway_watch.camera import CameraStream
 from hallway_watch.config import AppConfig, load_config
 from hallway_watch.detection_log import DetectionLogger
 from hallway_watch.detector import HeadDetector, load_roi_mask
 from hallway_watch.logging_setup import setup_logging
 from hallway_watch.motion import MotionGate
 from hallway_watch.preprocess import prepare_frame
-from hallway_watch.snapshots import save_alert_snapshot
+from hallway_watch.snapshots import cleanup_old_snapshots, save_alert_snapshot
 from hallway_watch.visit import VisitTracker
 from hallway_watch.web import NotificationServer
-
-
-def open_camera(config: AppConfig) -> cv2.VideoCapture:
-    cap = cv2.VideoCapture(config.camera.device)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.camera.width)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.camera.height)
-    cap.set(cv2.CAP_PROP_FPS, config.camera.fps)
-    if not cap.isOpened():
-        raise RuntimeError(f"Could not open camera device {config.camera.device}")
-    return cap
 
 
 def trigger_alert(
@@ -43,7 +34,12 @@ def trigger_alert(
 
     snapshot_path: str | None = None
     if config.snapshots.enabled:
-        saved = save_alert_snapshot(frame, detections, config.snapshots.dir)
+        saved = save_alert_snapshot(
+            frame,
+            detections,
+            config.snapshots.dir,
+            retention_days=config.snapshots.retention_days,
+        )
         if saved is not None:
             snapshot_path = str(saved)
 
@@ -67,12 +63,12 @@ def run(
     preview: bool = False,
 ) -> None:
     logger = logging.getLogger("hallway_watch")
-    cap = open_camera(config)
-
-    ret, frame = cap.read()
-    if not ret:
-        cap.release()
-        raise RuntimeError("Could not read initial frame from camera")
+    camera = CameraStream(
+        config.camera,
+        recovery_enabled=config.camera.recovery_enabled,
+        max_failures=config.camera.recovery_max_failures,
+    )
+    frame = camera.read_initial()
 
     roi_mask = load_roi_mask(config.detection.roi_mask, frame.shape)
     motion = MotionGate(
@@ -103,6 +99,9 @@ def run(
         notification_server = NotificationServer(config.notifications)
         notification_server.start()
 
+    if config.snapshots.enabled:
+        cleanup_old_snapshots(config.snapshots.dir, config.snapshots.retention_days)
+
     logger.info("Hallway watch started (preview=%s)", preview)
     logger.debug(
         "Logging detections to %s, debug to %s",
@@ -113,10 +112,8 @@ def run(
     try:
         while True:
             loop_start = time.monotonic()
-            ret, frame = cap.read()
-            if not ret:
-                logger.warning("Frame read failed — retrying")
-                time.sleep(0.5)
+            ret, frame = camera.read()
+            if not ret or frame is None:
                 continue
 
             processed = prepare_frame(
@@ -190,7 +187,7 @@ def run(
         if notification_server is not None:
             notification_server.stop()
         detection_logger.close()
-        cap.release()
+        camera.release()
         if preview:
             cv2.destroyAllWindows()
 

@@ -227,6 +227,7 @@ DETECTION_LOG_DIR="logs/detections"
 DEBUG_LOG_DIR="logs/debug"
 SNAPSHOTS_ENABLED=true
 SNAPSHOTS_DIR="snapshots"
+SNAPSHOTS_RETENTION_DAYS=7
 DETECTION_MODEL="models/yolov8n.pt"
 START_SERVICE=true
 INSTALL_LOG=""
@@ -288,6 +289,8 @@ camera:
   width: ${CAMERA_WIDTH}
   height: ${CAMERA_HEIGHT}
   fps: ${CAMERA_FPS}
+  recovery_enabled: true
+  recovery_max_failures: 15
 
 detection:
   model: ${DETECTION_MODEL}
@@ -326,6 +329,7 @@ notifications:
 snapshots:
   enabled: ${SNAPSHOTS_ENABLED}
   dir: ${SNAPSHOTS_DIR}
+  retention_days: ${SNAPSHOTS_RETENTION_DAYS}
 
 logging:
   level: ${LOG_LEVEL}

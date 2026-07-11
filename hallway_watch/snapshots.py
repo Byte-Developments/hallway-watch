@@ -3,24 +3,66 @@
 from __future__ import annotations
 
 import logging
+import re
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import cv2
 import numpy as np
 
-from hallway_watch.timezone_util import eastern_now
+from hallway_watch.timezone_util import EASTERN, eastern_now
 
 logger = logging.getLogger(__name__)
+
+SNAPSHOT_NAME_RE = re.compile(r"^alert-(\d{4}-\d{2}-\d{2})_")
 
 
 def _snapshot_filename() -> str:
     return eastern_now().strftime("alert-%Y-%m-%d_%H-%M-%S.jpg")
 
 
+def _snapshot_date(path: Path) -> date:
+    match = SNAPSHOT_NAME_RE.match(path.name)
+    if match:
+        return date.fromisoformat(match.group(1))
+    return datetime.fromtimestamp(path.stat().st_mtime, tz=EASTERN).date()
+
+
+def cleanup_old_snapshots(snapshot_dir: str | Path, retention_days: int = 7) -> int:
+    """Delete alert JPEGs older than retention_days (Eastern dates). Returns count removed."""
+    if retention_days <= 0:
+        return 0
+
+    directory = Path(snapshot_dir)
+    if not directory.is_dir():
+        return 0
+
+    cutoff = eastern_now().date() - timedelta(days=retention_days)
+    removed = 0
+    for path in directory.glob("alert-*.jpg"):
+        try:
+            if _snapshot_date(path) < cutoff:
+                path.unlink()
+                removed += 1
+        except OSError as exc:
+            logger.warning("Could not remove old snapshot %s: %s", path, exc)
+
+    if removed:
+        logger.info(
+            "Removed %d snapshot(s) older than %d days from %s",
+            removed,
+            retention_days,
+            directory,
+        )
+    return removed
+
+
 def save_alert_snapshot(
     frame: np.ndarray,
     detections: list[tuple[int, int, int, int, float]],
     snapshot_dir: str | Path,
+    *,
+    retention_days: int = 7,
 ) -> Path | None:
     """Draw head boxes on the frame and save a JPEG. Returns path or None on failure."""
     directory = Path(snapshot_dir)
@@ -45,4 +87,5 @@ def save_alert_snapshot(
         return None
 
     logger.info("Saved alert snapshot: %s", path)
+    cleanup_old_snapshots(directory, retention_days)
     return path

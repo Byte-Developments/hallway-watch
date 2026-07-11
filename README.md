@@ -57,6 +57,8 @@ Key settings:
 | `detection.motion_threshold` | Lower = triggers AI more often |
 | `detection.roi_mask` | B&W PNG — white = watch area, black = ignore |
 | `snapshots.dir` | Where alert JPEGs are saved (default: `snapshots/`) |
+| `snapshots.retention_days` | Delete alert JPEGs older than this (default: `7`) |
+| `camera.recovery_enabled` | Reopen USB camera after sustained read failures (default: on) |
 | `notifications.port` | HTTPS web page port (default: 8765) |
 | `audio.sound_file` | Path to a `.wav` alert sound |
 
