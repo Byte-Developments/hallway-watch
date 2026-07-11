@@ -60,6 +60,12 @@ class NotificationConfig:
 
 
 @dataclass
+class SnapshotsConfig:
+    enabled: bool = True
+    dir: str = "snapshots"
+
+
+@dataclass
 class LoggingConfig:
     level: str = "INFO"
     debug_level: str = "DEBUG"
@@ -73,6 +79,7 @@ class AppConfig:
     detection: DetectionConfig
     audio: AudioConfig
     notifications: NotificationConfig
+    snapshots: SnapshotsConfig
     logging: LoggingConfig
 
 
@@ -91,5 +98,6 @@ def load_config(path: str | Path = "config.yaml") -> AppConfig:
         detection=DetectionConfig(**raw.get("detection", {})),
         audio=AudioConfig(**raw.get("audio", {})),
         notifications=NotificationConfig(**raw.get("notifications", {})),
+        snapshots=SnapshotsConfig(**raw.get("snapshots", {})),
         logging=LoggingConfig(**raw.get("logging", {})),
     )

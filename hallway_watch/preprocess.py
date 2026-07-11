@@ -44,7 +44,7 @@ def enhance_low_light(
     gray = to_grayscale(frame)
 
     if denoise:
-        gray = cv2.bilateralFilter(gray, d=5, sigmaColor=40, sigmaSpace=40)
+        gray = cv2.bilateralFilter(gray, d=5, sigmaColor=40, sigmaSpace=40) # setting space to 40 for color array
 
     effective_gamma = auto_gamma_for_brightness(gray, gamma)
     gray = apply_gamma(gray, effective_gamma)

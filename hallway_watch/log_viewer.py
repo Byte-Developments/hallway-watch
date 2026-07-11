@@ -8,10 +8,11 @@ import gzip
 import re
 import sys
 import time
-from datetime import date
 from pathlib import Path
 
 import yaml
+
+from hallway_watch.timezone_util import eastern_today
 
 POLL_MS = 400
 
@@ -54,7 +55,7 @@ def list_log_files(log_dir: Path, prefix: str) -> list[Path]:
 
 
 def today_log_path(log_dir: Path, prefix: str) -> Path:
-    return log_dir / f"{prefix}-{date.today().isoformat()}.log"
+    return log_dir / f"{prefix}-{eastern_today()}.log"
 
 
 class LogViewer:

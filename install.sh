@@ -2,18 +2,51 @@
 #
 # Hallway Watch — interactive installer
 #
-# From a copied/cloned repo:
-#   chmod +x install.sh && ./install.sh
-#
-# One-liner (curl from GitHub):
+# One-liner (SSH into the Pi, then paste):
 #   curl -fsSL https://raw.githubusercontent.com/Byte-Developments/hallway-watch/main/install.sh | bash
+#
+# Non-interactive (accept all defaults):
+#   curl -fsSL https://raw.githubusercontent.com/Byte-Developments/hallway-watch/main/install.sh | bash -s -- -y
 #
 set -euo pipefail
 
-# --- resolve project directory (local repo vs curl + clone) -----------------
+# --- resolve project directory (clone from GitHub when curl-piped) ---------
 
 INSTALL_DIR="${HALLWAY_WATCH_DIR:-$HOME/hallway-watch}"
 REPO_URL="${HALLWAY_WATCH_REPO:-https://github.com/Byte-Developments/hallway-watch.git}"
+DEFAULT_INSTALL_URL="https://raw.githubusercontent.com/Byte-Developments/hallway-watch/main/install.sh"
+
+ensure_git() {
+  if command -v git >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "==> Installing git (required to download Hallway Watch)"
+  if command -v apt-get >/dev/null 2>&1; then
+    sudo apt-get update -qq
+    sudo apt-get install -y git
+    return 0
+  fi
+  echo "git is required but could not be installed automatically." >&2
+  exit 1
+}
+
+find_project_dir() {
+  local dir="$1"
+  [[ -f "$dir/hallway_watch/main.py" && -f "$dir/requirements.txt" ]]
+}
+
+clone_or_update_repo() {
+  ensure_git
+  echo "==> Downloading Hallway Watch into ${INSTALL_DIR}"
+  if [[ -d "${INSTALL_DIR}/.git" ]]; then
+    git -C "${INSTALL_DIR}" pull --ff-only
+  elif [[ -d "${INSTALL_DIR}" ]]; then
+    rm -rf "${INSTALL_DIR}"
+    git clone "${REPO_URL}" "${INSTALL_DIR}"
+  else
+    git clone "${REPO_URL}" "${INSTALL_DIR}"
+  fi
+}
 
 if [[ -n "${BASH_SOURCE[0]:-}" && "${BASH_SOURCE[0]}" != "bash" && "${BASH_SOURCE[0]}" != "-bash" ]]; then
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,31 +54,22 @@ else
   SCRIPT_DIR=""
 fi
 
-find_project_dir() {
-  local dir="$1"
-  [[ -f "$dir/hallway_watch/main.py" && -f "$dir/requirements.txt" ]]
-}
-
 if [[ -n "$SCRIPT_DIR" ]] && find_project_dir "$SCRIPT_DIR"; then
   PROJECT_DIR="$SCRIPT_DIR"
 elif find_project_dir "$INSTALL_DIR"; then
   PROJECT_DIR="$INSTALL_DIR"
-elif [[ -n "$REPO_URL" ]]; then
-  echo "==> Cloning Hallway Watch into $INSTALL_DIR"
-  if [[ -d "$INSTALL_DIR/.git" ]]; then
-    git -C "$INSTALL_DIR" pull --ff-only
-  else
-    rm -rf "$INSTALL_DIR"
-    git clone "$REPO_URL" "$INSTALL_DIR"
-  fi
-  PROJECT_DIR="$INSTALL_DIR"
 else
+  clone_or_update_repo
+  PROJECT_DIR="$INSTALL_DIR"
+fi
+
+if ! find_project_dir "$PROJECT_DIR"; then
   cat <<EOF
-Could not find the Hallway Watch project files.
+Could not find Hallway Watch after install.
 
-Run this script from inside the project directory, or use the one-liner:
+Try the one-liner again:
 
-  curl -fsSL https://raw.githubusercontent.com/Byte-Developments/hallway-watch/main/install.sh | bash
+  curl -fsSL ${DEFAULT_INSTALL_URL} | bash
 
 EOF
   exit 1
@@ -73,12 +97,27 @@ banner() {
   echo
 }
 
+can_prompt() {
+  [[ -r /dev/tty ]]
+}
+
+read_tty() {
+  # When curl-piped, stdin is the script — read prompts from the terminal instead.
+  local __prompt=$1
+  local __var=$2
+  if can_prompt; then
+    read -rp "$__prompt" "$__var" </dev/tty
+  else
+    read -rp "$__prompt" "$__var"
+  fi
+}
+
 prompt() {
   local __var=$1
   local __text=$2
   local __default=$3
   local __input=""
-  read -rp "${__text} [${__default}]: " __input
+  read_tty "${__text} [${__default}]: " __input
   printf -v "$__var" '%s' "${__input:-$__default}"
 }
 
@@ -96,7 +135,7 @@ prompt_yn() {
   fi
 
   while true; do
-    read -rp "${__text} [${__hint}]: " __input
+    read_tty "${__text} [${__hint}]: " __input
     __input="${__input:-$__default}"
     case "${__input,,}" in
       y|yes) printf -v "$__var" '%s' "true"; return ;;
@@ -110,6 +149,10 @@ usage() {
   cat <<EOF
 Usage: $(basename "$0") [options]
 
+Install (on the Pi):
+
+  curl -fsSL ${DEFAULT_INSTALL_URL} | bash
+
 Options:
   -h, --help       Show this help
   -y, --yes        Accept all defaults (non-interactive)
@@ -118,7 +161,7 @@ Options:
 
 Environment:
   HALLWAY_WATCH_DIR   Install directory (default: ~/hallway-watch)
-  HALLWAY_WATCH_REPO  Git repo URL for curl installs
+  HALLWAY_WATCH_REPO  Git repo URL (default: Byte-Developments/hallway-watch)
 EOF
 }
 
@@ -138,9 +181,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Curl-piped with no TTY and no -y → use defaults (non-interactive install)
+if [[ "$NONINTERACTIVE" == "false" ]] && ! can_prompt; then
+  echo "No terminal for prompts — using default settings (pass -y to silence this message)."
+  NONINTERACTIVE=true
+fi
+
 RUN_USER="$(id -un)"
 RUN_HOME="$(eval echo "~$RUN_USER")"
-PI_HOSTNAME="$(hostname -s 2>/dev/null || echo raspberrypi)"
+PI_HOSTNAME="hallway"
 
 # config defaults
 CAMERA_DEVICE=0
@@ -176,6 +225,8 @@ LOG_LEVEL="INFO"
 LOG_DEBUG_LEVEL="DEBUG"
 DETECTION_LOG_DIR="logs/detections"
 DEBUG_LOG_DIR="logs/debug"
+SNAPSHOTS_ENABLED=true
+SNAPSHOTS_DIR="snapshots"
 DETECTION_MODEL="models/yolov8n.pt"
 START_SERVICE=true
 INSTALL_LOG=""
@@ -230,7 +281,7 @@ write_config() {
   fi
 
   cat > config.yaml <<EOF
-# Generated by install.sh on $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+# Generated by install.sh on $(TZ=America/New_York date +"%Y-%m-%dT%H:%M:%S %Z")
 
 camera:
   device: ${CAMERA_DEVICE}
@@ -272,6 +323,10 @@ notifications:
   tls_key: ${TLS_KEY}
   vapid_contact: ${VAPID_CONTACT}
 
+snapshots:
+  enabled: ${SNAPSHOTS_ENABLED}
+  dir: ${SNAPSHOTS_DIR}
+
 logging:
   level: ${LOG_LEVEL}
   debug_level: ${LOG_DEBUG_LEVEL}
@@ -294,6 +349,8 @@ fi
 
 INSTALL_LOG="${PROJECT_DIR}/install.log"
 chmod +x "${PROJECT_DIR}/scripts/download_model.sh" 2>/dev/null || true
+chmod +x "${PROJECT_DIR}/scripts/setup_mdns.sh" 2>/dev/null || true
+chmod +x "${PROJECT_DIR}/scripts/generate_cert.sh" 2>/dev/null || true
 
 spinner() {
   local pid=$1
@@ -316,7 +373,7 @@ run_install() {
       sudo apt-get update -qq
       sudo apt-get install -y \
         python3 python3-venv python3-pip \
-        alsa-utils libatlas-base-dev libgl1 openssl git curl
+        alsa-utils libatlas-base-dev libgl1 openssl git curl avahi-daemon avahi-utils
     ) &
     pid_apt=$!
   else
@@ -344,16 +401,11 @@ run_install() {
 
   mkdir -p "${PROJECT_DIR}/assets/sounds" "${PROJECT_DIR}/data" "${PROJECT_DIR}/certs"
   mkdir -p "${PROJECT_DIR}/logs/detections" "${PROJECT_DIR}/logs/debug"
+  mkdir -p "${PROJECT_DIR}/snapshots"
 
-  echo "==> [4/5] TLS certificate"
-  if [[ ! -f "${PROJECT_DIR}/certs/cert.pem" ]]; then
-    openssl req -x509 -newkey rsa:2048 \
-      -keyout "${PROJECT_DIR}/certs/key.pem" \
-      -out "${PROJECT_DIR}/certs/cert.pem" \
-      -days 3650 -nodes -subj "/CN=${PI_HOSTNAME}.local" 2>/dev/null
-  else
-    echo "    Certificate already exists"
-  fi
+  echo "==> [4/5] mDNS hostname + TLS certificate"
+  bash "${PROJECT_DIR}/scripts/setup_mdns.sh"
+  bash "${PROJECT_DIR}/scripts/generate_cert.sh"
 
   if [[ "$NO_SERVICE" == "false" ]] && command -v systemctl >/dev/null 2>&1; then
     echo "==> systemd service"
@@ -390,7 +442,7 @@ HALLWAY_WATCH_REPO=${REPO_URL}
 EOF
   sudo ln -sf "${PROJECT_DIR}/bin/hwatch" /usr/local/bin/hwatch
 
-  echo "==> Install finished at $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  echo "==> Install finished at $(TZ=America/New_York date +"%Y-%m-%dT%H:%M:%S %Z")"
 }
 
 echo "==> Installing code, pip libraries, and model weights in the background"
@@ -438,9 +490,9 @@ echo
 echo "  Project:  ${PROJECT_DIR}"
 echo "  Config:   ${PROJECT_DIR}/config.yaml"
 if [[ -n "$PI_IP" ]]; then
-  echo "  Notify:   https://${PI_IP}:${NOTIFY_PORT}"
+  echo "  Notify:   https://hallway.local:${NOTIFY_PORT}  (or https://${PI_IP}:${NOTIFY_PORT})"
 else
-  echo "  Notify:   https://<pi-ip>:${NOTIFY_PORT}"
+  echo "  Notify:   https://hallway.local:${NOTIFY_PORT}"
 fi
 echo
 echo "Next steps:"

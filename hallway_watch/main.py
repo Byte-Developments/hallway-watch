@@ -16,6 +16,7 @@ from hallway_watch.detector import HeadDetector, load_roi_mask
 from hallway_watch.logging_setup import setup_logging
 from hallway_watch.motion import MotionGate
 from hallway_watch.preprocess import prepare_frame
+from hallway_watch.snapshots import save_alert_snapshot
 from hallway_watch.visit import VisitTracker
 from hallway_watch.web import NotificationServer
 
@@ -36,14 +37,24 @@ def trigger_alert(
     detection_logger: DetectionLogger,
     notification_server: NotificationServer | None,
     detections: list[tuple[int, int, int, int, float]],
+    frame: np.ndarray,
 ) -> None:
     max_conf = max(conf for _, _, _, _, conf in detections)
-    detection_logger.log_alert(len(detections), max_conf)
+
+    snapshot_path: str | None = None
+    if config.snapshots.enabled:
+        saved = save_alert_snapshot(frame, detections, config.snapshots.dir)
+        if saved is not None:
+            snapshot_path = str(saved)
+
+    detection_logger.log_alert(len(detections), max_conf, snapshot_path)
     logger.info(
         "Head detected — triggering alert (count=%d max_conf=%.0f%%)",
         len(detections),
         max_conf * 100,
     )
+    if snapshot_path:
+        logger.info("Alert snapshot: %s", snapshot_path)
     if config.audio.enabled:
         play_sound(config.audio.sound_file, config.audio.device)
     if config.notifications.enabled and notification_server is not None:
@@ -140,7 +151,12 @@ def run(
 
             if should_alert and detections:
                 trigger_alert(
-                    config, logger, detection_logger, notification_server, detections
+                    config,
+                    logger,
+                    detection_logger,
+                    notification_server,
+                    detections,
+                    frame,
                 )
 
             if preview:

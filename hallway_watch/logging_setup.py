@@ -8,6 +8,9 @@ import sys
 from hallway_watch.config import AppConfig
 from hallway_watch.daily_log import DailyGzipLoggingHandler
 from hallway_watch.detection_log import DetectionLogger
+from hallway_watch.timezone_util import EasternFormatter
+
+_LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
 
 def setup_logging(config: AppConfig) -> DetectionLogger:
@@ -24,9 +27,7 @@ def setup_logging(config: AppConfig) -> DetectionLogger:
 
     console = logging.StreamHandler(sys.stdout)
     console.setLevel(level)
-    console.setFormatter(
-        logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-    )
+    console.setFormatter(EasternFormatter(_LOG_FORMAT))
     root.addHandler(console)
 
     debug_handler = DailyGzipLoggingHandler(
@@ -34,9 +35,7 @@ def setup_logging(config: AppConfig) -> DetectionLogger:
         "debug",
         level=debug_level,
     )
-    debug_handler.setFormatter(
-        logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-    )
+    debug_handler.setFormatter(EasternFormatter(_LOG_FORMAT))
     root.addHandler(debug_handler)
 
     # Quiet noisy third-party loggers unless debugging hard

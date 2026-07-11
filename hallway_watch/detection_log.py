@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from hallway_watch.daily_log import DailyLogWriter, _utc_now_iso
+from hallway_watch.daily_log import DailyLogWriter
+from hallway_watch.timezone_util import eastern_now_iso
 
 
 class DetectionLogger:
@@ -18,7 +19,7 @@ class DetectionLogger:
         y2: int,
     ) -> None:
         self._writer.write_line(
-            f"{_utc_now_iso()}\tHEAD\t"
+            f"{eastern_now_iso()}\tHEAD\t"
             f"conf={confidence:.3f}\tx1={x1}\ty1={y1}\tx2={x2}\ty2={y2}"
         )
 
@@ -29,16 +30,23 @@ class DetectionLogger:
         for x1, y1, x2, y2, conf in detections:
             self.log_head(conf, x1, y1, x2, y2)
 
-    def log_alert(self, detection_count: int, max_conf: float) -> None:
+    def log_alert(
+        self,
+        detection_count: int,
+        max_conf: float,
+        snapshot_path: str | None = None,
+    ) -> None:
+        snapshot_field = f"\tsnapshot={snapshot_path}" if snapshot_path else ""
         self._writer.write_line(
-            f"{_utc_now_iso()}\tALERT\tcount={detection_count}\tmax_conf={max_conf:.3f}"
+            f"{eastern_now_iso()}\tALERT\t"
+            f"count={detection_count}\tmax_conf={max_conf:.3f}{snapshot_field}"
         )
 
     def log_visit_clear(self) -> None:
-        self._writer.write_line(f"{_utc_now_iso()}\tVISIT_CLEAR")
+        self._writer.write_line(f"{eastern_now_iso()}\tVISIT_CLEAR")
 
     def log_motion(self) -> None:
-        self._writer.write_line(f"{_utc_now_iso()}\tMOTION")
+        self._writer.write_line(f"{eastern_now_iso()}\tMOTION")
 
     def close(self) -> None:
         self._writer.close()

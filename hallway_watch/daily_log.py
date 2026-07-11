@@ -5,12 +5,9 @@ from __future__ import annotations
 import gzip
 import logging
 import threading
-from datetime import date, datetime, timezone
 from pathlib import Path
 
-
-def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+from hallway_watch.timezone_util import eastern_today
 
 
 def compress_log_file(path: Path) -> None:
@@ -27,7 +24,7 @@ def compress_log_file(path: Path) -> None:
 
 def compress_old_logs(log_dir: Path, prefix: str, keep_today: bool = True) -> None:
     log_dir.mkdir(parents=True, exist_ok=True)
-    today = date.today().isoformat()
+    today = eastern_today()
     for path in sorted(log_dir.glob(f"{prefix}-*.log")):
         if keep_today and today in path.name:
             continue
@@ -35,7 +32,7 @@ def compress_old_logs(log_dir: Path, prefix: str, keep_today: bool = True) -> No
 
 
 class DailyLogWriter:
-    """Append-only writer that rolls over at UTC midnight and gzips old files."""
+    """Append-only writer that rolls over at Eastern midnight and gzips old files."""
 
     def __init__(self, log_dir: str | Path, prefix: str) -> None:
         self._log_dir = Path(log_dir)
@@ -61,7 +58,7 @@ class DailyLogWriter:
         self._handle = self._path_for_day(day).open("a", encoding="utf-8")
 
     def write_line(self, line: str) -> None:
-        day = date.today().isoformat()
+        day = eastern_today()
         with self._lock:
             self._ensure_day(day)
             assert self._handle is not None
@@ -83,7 +80,7 @@ class DailyLogWriter:
         return self._prefix
 
     def today_path(self) -> Path:
-        return self._path_for_day(date.today().isoformat())
+        return self._path_for_day(eastern_today())
 
 
 class DailyGzipLoggingHandler(logging.Handler):

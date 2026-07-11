@@ -42,6 +42,10 @@ notifications:
   tls_key: certs/key.pem
   vapid_contact: mailto:hallway-watch@local
 
+snapshots:
+  enabled: true
+  dir: snapshots
+
 logging:
   level: INFO
   debug_level: DEBUG
