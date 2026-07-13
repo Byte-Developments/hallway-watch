@@ -30,6 +30,21 @@ ensure_git() {
   exit 1
 }
 
+ensure_aplay() {
+  if command -v aplay >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "==> aplay not found — installing alsa-utils for audio alerts"
+  if command -v apt-get >/dev/null 2>&1; then
+    sudo apt-get update -qq
+    sudo apt-get install -y alsa-utils
+    return 0
+  fi
+  echo "Warning: aplay not found and apt-get unavailable — audio alerts will not work." >&2
+  echo "         Install alsa-utils manually or set audio.enabled: false in config.yaml." >&2
+  return 1
+}
+
 find_project_dir() {
   local dir="$1"
   [[ -f "$dir/hallway_watch/main.py" && -f "$dir/requirements.txt" ]]
@@ -389,6 +404,8 @@ run_install() {
 
   if [[ -n "$pid_apt" ]]; then wait "$pid_apt"; fi
   wait "$pid_model"
+
+  ensure_aplay || true
 
   echo "==> [2/5] Python virtual environment + pip libraries"
   python3 -m venv "${PROJECT_DIR}/.venv"
