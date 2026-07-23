@@ -7,7 +7,9 @@ import logging
 import threading
 from pathlib import Path
 
+from cryptography.hazmat.primitives import serialization
 from py_vapid import Vapid02
+from py_vapid.utils import b64urlencode
 from pywebpush import WebPushException, webpush
 
 logger = logging.getLogger(__name__)
@@ -25,6 +27,15 @@ def ensure_vapid_keys(keys_dir: Path) -> Vapid02:
     vapid.save_key(str(private_key))
     logger.info("Generated new VAPID keys in %s", keys_dir)
     return vapid
+
+
+def application_server_key(vapid: Vapid02) -> str:
+    """URL-safe base64 public key for PushManager.subscribe({ applicationServerKey })."""
+    raw_pub = vapid.public_key.public_bytes(
+        serialization.Encoding.X962,
+        serialization.PublicFormat.UncompressedPoint,
+    )
+    return b64urlencode(raw_pub)
 
 
 class PushSubscriptionStore:
@@ -86,7 +97,7 @@ class PushNotifier:
 
     @property
     def public_key(self) -> str:
-        return self._vapid.public_key
+        return application_server_key(self._vapid)
 
     def add_subscription(self, subscription: dict) -> None:
         self._store.add(subscription)
