@@ -390,9 +390,18 @@ run_install() {
   if command -v apt-get >/dev/null 2>&1; then
     (
       sudo apt-get update -qq
+      # OpenBLAS replaces ATLAS (libatlas-base-dev removed on Debian Trixie / newer Pi OS)
+      blas_pkg=""
+      if apt-cache show libopenblas-dev >/dev/null 2>&1; then
+        blas_pkg="libopenblas-dev"
+      elif apt-cache show libatlas-base-dev >/dev/null 2>&1; then
+        blas_pkg="libatlas-base-dev"
+      fi
+      # shellcheck disable=SC2086
       sudo apt-get install -y \
         python3 python3-venv python3-pip \
-        alsa-utils libatlas-base-dev libgl1 openssl git curl avahi-daemon avahi-utils
+        alsa-utils libgl1 openssl git curl avahi-daemon avahi-utils \
+        ${blas_pkg}
     ) &
     pid_apt=$!
   else
