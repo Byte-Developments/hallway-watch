@@ -421,9 +421,8 @@ run_install() {
   # Large wheels (torch/ultralytics) unpack under TMPDIR; on Pi /tmp is often
   # a small tmpfs, which fails with ENOSPC ("No space left") even when the SD has room.
   local pip_tmp="${PROJECT_DIR}/.pip-tmp"
+  local old_tmpdir="${TMPDIR:-}"
   mkdir -p "$pip_tmp"
-  export TMPDIR="$pip_tmp"
-  export PIP_CACHE_DIR="${PROJECT_DIR}/.pip-cache"
 
   # Fresh venv avoids half-written installs from a previous out-of-space failure
   rm -rf "${PROJECT_DIR}/.venv"
@@ -431,6 +430,12 @@ run_install() {
   TMPDIR="$pip_tmp" "${PROJECT_DIR}/.venv/bin/pip" install --upgrade pip -q
   TMPDIR="$pip_tmp" "${PROJECT_DIR}/.venv/bin/pip" install -r "${PROJECT_DIR}/requirements.txt"
   rm -rf "$pip_tmp"
+  # Restore TMPDIR so later mktemp (mDNS setup, etc.) does not use the deleted dir
+  if [[ -n "$old_tmpdir" ]]; then
+    export TMPDIR="$old_tmpdir"
+  else
+    unset TMPDIR
+  fi
 
   echo "==> [3/5] Model weights"
   if [[ -f "${PROJECT_DIR}/models/yolov8n.pt" ]]; then
