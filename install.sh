@@ -73,6 +73,13 @@ if [[ -n "$SCRIPT_DIR" ]] && find_project_dir "$SCRIPT_DIR"; then
   PROJECT_DIR="$SCRIPT_DIR"
 elif find_project_dir "$INSTALL_DIR"; then
   PROJECT_DIR="$INSTALL_DIR"
+  # curl|bash reuses ~/hallway-watch — pull so code matches the installer
+  if [[ -d "${PROJECT_DIR}/.git" ]]; then
+    ensure_git
+    echo "==> Updating existing install at ${PROJECT_DIR}"
+    git -C "${PROJECT_DIR}" remote set-url origin "$REPO_URL" 2>/dev/null || true
+    git -C "${PROJECT_DIR}" pull --ff-only || true
+  fi
 else
   clone_or_update_repo
   PROJECT_DIR="$INSTALL_DIR"
@@ -390,18 +397,12 @@ run_install() {
   if command -v apt-get >/dev/null 2>&1; then
     (
       sudo apt-get update -qq
-      # OpenBLAS replaces ATLAS (libatlas-base-dev removed on Debian Trixie / newer Pi OS)
-      blas_pkg=""
-      if apt-cache show libopenblas-dev >/dev/null 2>&1; then
-        blas_pkg="libopenblas-dev"
-      elif apt-cache show libatlas-base-dev >/dev/null 2>&1; then
-        blas_pkg="libatlas-base-dev"
-      fi
-      # shellcheck disable=SC2086
+      # Required packages only — never pull in removed ATLAS (breaks Debian Trixie / newer Pi OS)
       sudo apt-get install -y \
         python3 python3-venv python3-pip \
-        alsa-utils libgl1 openssl git curl avahi-daemon avahi-utils \
-        ${blas_pkg}
+        alsa-utils libgl1 openssl git curl avahi-daemon avahi-utils
+      # Optional BLAS for numpy; pip wheels usually ship their own if this is missing
+      sudo apt-get install -y libopenblas-dev || true
     ) &
     pid_apt=$!
   else
