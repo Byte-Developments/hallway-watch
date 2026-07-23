@@ -17,27 +17,26 @@ Lightweight head detection for Raspberry Pi. Watches a hallway via USB webcam, p
 SSH into your Raspberry Pi and paste:
 
 ```bash
-git clone --depth 1 https://github.com/Byte-Developments/hallway-watch.git ~/hallway-watch
-~/hallway-watch/install.sh
+curl -fsSL https://raw.githubusercontent.com/Byte-Developments/hallway-watch/main/scripts/bootstrap.sh | bash
 ```
 
-That's it. The script walks you through setup prompts, installs everything, sets hostname to **hallway.local**, and starts the service.
+That's it. The bootstrap clones/pulls the latest code into `~/hallway-watch`, then runs the installer (setup prompts, dependencies, **hallway.local**, systemd service).
 
-**Already cloned / re-run install:**
+**Skip prompts** (use all defaults):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Byte-Developments/hallway-watch/main/scripts/bootstrap.sh | bash -s -- -y
+```
+
+Installer flags: `-y` defaults only · `--config-only` rewrite config · `--no-service` skip systemd · `-h` help
+
+**Already installed / re-run:**
 
 ```bash
 cd ~/hallway-watch && git pull && ./install.sh
 ```
 
-**Skip prompts** (use all defaults):
-
-```bash
-~/hallway-watch/install.sh -y
-```
-
-Installer flags: `-y` defaults only · `--config-only` rewrite config · `--no-service` skip systemd · `-h` help
-
-> Prefer `git pull && ./install.sh` over `curl … | bash` — GitHub’s raw CDN can serve a stale `install.sh` for a while after pushes.
+Or just re-run the same curl one-liner — it pulls latest first.
 
 ## Updates
 

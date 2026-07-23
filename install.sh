@@ -3,10 +3,10 @@
 # Hallway Watch — interactive installer
 #
 # One-liner (SSH into the Pi, then paste):
-#   curl -fsSL https://raw.githubusercontent.com/Byte-Developments/hallway-watch/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Byte-Developments/hallway-watch/main/scripts/bootstrap.sh | bash
 #
 # Non-interactive (accept all defaults):
-#   curl -fsSL https://raw.githubusercontent.com/Byte-Developments/hallway-watch/main/install.sh | bash -s -- -y
+#   curl -fsSL https://raw.githubusercontent.com/Byte-Developments/hallway-watch/main/scripts/bootstrap.sh | bash -s -- -y
 #
 set -euo pipefail
 
@@ -14,7 +14,7 @@ set -euo pipefail
 
 INSTALL_DIR="${HALLWAY_WATCH_DIR:-$HOME/hallway-watch}"
 REPO_URL="${HALLWAY_WATCH_REPO:-https://github.com/Byte-Developments/hallway-watch.git}"
-DEFAULT_INSTALL_URL="https://raw.githubusercontent.com/Byte-Developments/hallway-watch/main/install.sh"
+DEFAULT_INSTALL_URL="https://raw.githubusercontent.com/Byte-Developments/hallway-watch/main/scripts/bootstrap.sh"
 
 ensure_git() {
   if command -v git >/dev/null 2>&1; then
