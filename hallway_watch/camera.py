@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
+from pathlib import Path
 
 import cv2
 
@@ -16,13 +17,35 @@ DEFAULT_REOPEN_DELAY_S = 1.0
 DEFAULT_RETRY_DELAY_S = 0.5
 
 
+def _camera_source(device: int | str) -> int | str:
+    """Prefer an explicit /dev/videoN path so OpenCV doesn't pick Pi codec nodes."""
+    if isinstance(device, str):
+        return device
+    path = Path(f"/dev/video{device}")
+    if path.exists():
+        return str(path)
+    return device
+
+
 def open_camera(config: CameraConfig) -> cv2.VideoCapture:
-    cap = cv2.VideoCapture(config.device)
+    source = _camera_source(config.device)
+    # CAP_V4L2 avoids GStreamer/obsensor probes that mis-handle Logitech UVC nodes
+    cap = cv2.VideoCapture(source, cv2.CAP_V4L2)
+    if not cap.isOpened() and source != config.device:
+        logger.warning("V4L2 open failed for %s — retrying with configured device %s", source, config.device)
+        cap = cv2.VideoCapture(config.device, cv2.CAP_V4L2)
+    if not cap.isOpened():
+        cap = cv2.VideoCapture(source)
+
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, config.width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.height)
     cap.set(cv2.CAP_PROP_FPS, config.fps)
     if not cap.isOpened():
-        raise RuntimeError(f"Could not open camera device {config.device}")
+        raise RuntimeError(
+            f"Could not open camera device {config.device} (tried {source}). "
+            "Check: v4l2-ctl --list-devices, that your user is in the 'video' group, "
+            "and that hallway-watch.service is stopped while testing."
+        )
     return cap
 
 

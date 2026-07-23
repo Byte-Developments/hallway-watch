@@ -8,7 +8,7 @@ import yaml
 
 @dataclass
 class CameraConfig:
-    device: int = 0
+    device: int | str = 0
     width: int = 800
     height: int = 600
     fps: int = 8
