@@ -428,7 +428,10 @@ run_install() {
   rm -rf "${PROJECT_DIR}/.venv"
   python3 -m venv "${PROJECT_DIR}/.venv"
   TMPDIR="$pip_tmp" "${PROJECT_DIR}/.venv/bin/pip" install --upgrade pip -q
-  TMPDIR="$pip_tmp" "${PROJECT_DIR}/.venv/bin/pip" install -r "${PROJECT_DIR}/requirements.txt"
+  bash "${PROJECT_DIR}/scripts/install_pip_deps.sh" \
+    "${PROJECT_DIR}" \
+    "${PROJECT_DIR}/.venv/bin/pip" \
+    "$pip_tmp"
   rm -rf "$pip_tmp"
   # Restore TMPDIR so later mktemp (mDNS setup, etc.) does not use the deleted dir
   if [[ -n "$old_tmpdir" ]]; then

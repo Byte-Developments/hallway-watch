@@ -109,7 +109,10 @@ cmd_update() {
   local pip_tmp="${PROJECT_DIR}/.pip-tmp"
   mkdir -p "$pip_tmp"
   TMPDIR="$pip_tmp" .venv/bin/pip install --upgrade pip -q
-  TMPDIR="$pip_tmp" .venv/bin/pip install -r requirements.txt -q
+  bash "${PROJECT_DIR}/scripts/install_pip_deps.sh" \
+    "${PROJECT_DIR}" \
+    "${PROJECT_DIR}/.venv/bin/pip" \
+    "$pip_tmp"
   rm -rf "$pip_tmp"
 
   log "Checking model weights"
