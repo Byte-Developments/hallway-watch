@@ -58,7 +58,7 @@ class NotificationConfig:
     tls_enabled: bool = True
     tls_cert: str = "certs/cert.pem"
     tls_key: str = "certs/key.pem"
-    vapid_contact: str = "mailto:hallway-watch@local"
+    vapid_contact: str = "mailto:hallway-watch@localhost"
 
 
 @dataclass

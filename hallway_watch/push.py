@@ -118,10 +118,23 @@ class PushNotifier:
                 sent += 1
             except WebPushException as exc:
                 status = getattr(exc.response, "status_code", None)
+                body = ""
+                try:
+                    if exc.response is not None:
+                        body = exc.response.text[:300]
+                except Exception:
+                    body = ""
                 if status in (404, 410):
                     logger.info("Removing expired push subscription")
                     self._store.remove(endpoint)
                 else:
-                    logger.error("Web push failed: %s", exc)
+                    logger.error(
+                        "Web push failed (status=%s): %s %s",
+                        status,
+                        exc,
+                        body,
+                    )
+            except Exception as exc:
+                logger.exception("Web push unexpected error: %s", exc)
 
         return sent

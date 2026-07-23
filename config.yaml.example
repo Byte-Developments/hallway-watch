@@ -42,7 +42,7 @@ notifications:
   tls_enabled: true
   tls_cert: certs/cert.pem
   tls_key: certs/key.pem
-  vapid_contact: mailto:hallway-watch@local
+  vapid_contact: mailto:hallway-watch@localhost
 
 snapshots:
   enabled: true
