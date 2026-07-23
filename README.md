@@ -17,18 +17,27 @@ Lightweight head detection for Raspberry Pi. Watches a hallway via USB webcam, p
 SSH into your Raspberry Pi and paste:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Byte-Developments/hallway-watch/main/install.sh | bash
+git clone --depth 1 https://github.com/Byte-Developments/hallway-watch.git ~/hallway-watch
+~/hallway-watch/install.sh
 ```
 
-That's it. The script downloads the project from GitHub, walks you through setup prompts, installs everything, sets hostname to **hallway.local**, and starts the service.
+That's it. The script walks you through setup prompts, installs everything, sets hostname to **hallway.local**, and starts the service.
+
+**Already cloned / re-run install:**
+
+```bash
+cd ~/hallway-watch && git pull && ./install.sh
+```
 
 **Skip prompts** (use all defaults):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Byte-Developments/hallway-watch/main/install.sh | bash -s -- -y
+~/hallway-watch/install.sh -y
 ```
 
 Installer flags: `-y` defaults only · `--config-only` rewrite config · `--no-service` skip systemd · `-h` help
+
+> Prefer `git pull && ./install.sh` over `curl … | bash` — GitHub’s raw CDN can serve a stale `install.sh` for a while after pushes.
 
 ## Updates
 
