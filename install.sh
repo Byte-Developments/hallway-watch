@@ -418,9 +418,19 @@ run_install() {
   ensure_aplay || true
 
   echo "==> [2/5] Python virtual environment + pip libraries"
+  # Large wheels (torch/ultralytics) unpack under TMPDIR; on Pi /tmp is often
+  # a small tmpfs, which fails with ENOSPC ("No space left") even when the SD has room.
+  local pip_tmp="${PROJECT_DIR}/.pip-tmp"
+  mkdir -p "$pip_tmp"
+  export TMPDIR="$pip_tmp"
+  export PIP_CACHE_DIR="${PROJECT_DIR}/.pip-cache"
+
+  # Fresh venv avoids half-written installs from a previous out-of-space failure
+  rm -rf "${PROJECT_DIR}/.venv"
   python3 -m venv "${PROJECT_DIR}/.venv"
-  "${PROJECT_DIR}/.venv/bin/pip" install --upgrade pip -q
-  "${PROJECT_DIR}/.venv/bin/pip" install -r "${PROJECT_DIR}/requirements.txt" -q
+  TMPDIR="$pip_tmp" "${PROJECT_DIR}/.venv/bin/pip" install --upgrade pip -q
+  TMPDIR="$pip_tmp" "${PROJECT_DIR}/.venv/bin/pip" install -r "${PROJECT_DIR}/requirements.txt"
+  rm -rf "$pip_tmp"
 
   echo "==> [3/5] Model weights"
   if [[ -f "${PROJECT_DIR}/models/yolov8n.pt" ]]; then

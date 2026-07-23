@@ -106,8 +106,11 @@ cmd_update() {
     echo "Virtual environment missing — run ${PROJECT_DIR}/install.sh" >&2
     exit 1
   fi
-  .venv/bin/pip install --upgrade pip -q
-  .venv/bin/pip install -r requirements.txt -q
+  local pip_tmp="${PROJECT_DIR}/.pip-tmp"
+  mkdir -p "$pip_tmp"
+  TMPDIR="$pip_tmp" .venv/bin/pip install --upgrade pip -q
+  TMPDIR="$pip_tmp" .venv/bin/pip install -r requirements.txt -q
+  rm -rf "$pip_tmp"
 
   log "Checking model weights"
   bash "${PROJECT_DIR}/scripts/download_model.sh"
